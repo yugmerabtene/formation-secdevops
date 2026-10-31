@@ -1,0 +1,26 @@
+title = "Détection de secrets du lab J1-M2"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documents pédagogiques qui citent volontairement les valeurs de démonstration."
+paths = [
+  '''preuves-controles\.md''',
+  '''README\.md''',
+  '''corrige/''',
+  '''outils/''',
+  '''\.venv/''',
+]
+
+[[rules]]
+id = "flask-secret-key"
+description = "Cle de session Flask ecrite dans le source"
+regex = '''(?i)secret_key\s*=\s*["'][^"']{8,}["']'''
+tags = ["secret", "flask"]
+
+[[rules]]
+id = "python-password"
+description = "Mot de passe ecrit dans le source"
+regex = '''(?i)(password|passwd)\s*=\s*["'][^"']{8,}["']'''
+tags = ["secret", "python"]

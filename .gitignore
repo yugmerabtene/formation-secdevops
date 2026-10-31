@@ -1,0 +1,39 @@
+# Secrets — ne jamais versionner
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+.netrc
+.npmrc
+.pypirc
+credentials
+credentials.*
+secrets.*
+secrets/
+*_rsa
+*_dsa
+*_ed25519
+
+# Artefacts produits par les labs
+donnees-sonarqube/
+rapports/
+travail/
+.scannerwork/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Divers
+.DS_Store
+._*
+*.tmp
+*.swp

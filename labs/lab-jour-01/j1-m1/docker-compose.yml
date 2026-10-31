@@ -1,0 +1,33 @@
+# Deploiement de demonstration de l'API de notes NordMail sur l'hote de staging.
+# FICHIER PEDAGOGIQUE : les defauts sont volontaires et decrits dans le
+# module J1-M1. Aucune donnee reelle, identifiants de demonstration.
+
+name: nordmail-staging
+
+services:
+  api:
+    image: registry.local/notes-api:latest
+    container_name: nordmail-api
+    privileged: true
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: "postgresql://notes:mot-de-passe-exemple@db:5432/notes"
+      FLASK_DEBUG: "1"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
+  db:
+    image: postgres:16-alpine
+    container_name: nordmail-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: notes
+      POSTGRES_PASSWORD: mot-de-passe-exemple
+      POSTGRES_DB: notes
+    volumes:
+      - "donnees-db:/var/lib/postgresql/data"
+
+volumes:
+  donnees-db:

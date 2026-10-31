@@ -1,0 +1,13 @@
+# Artefacts produits par l'apprenant, ancrés à la racine du lab :
+# les fichiers de corrige/ restent versionnés.
+/travail/
+/rapport-trivy.json
+/rapport-pipaudit.json
+/sbom-app.json
+/sbom-image.json
+/registre-vulnerabilites.md
+/rapport-analyse.md
+/epss.json
+/kev.json
+__pycache__/
+*.pyc

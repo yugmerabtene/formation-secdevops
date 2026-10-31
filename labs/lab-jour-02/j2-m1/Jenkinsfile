@@ -1,0 +1,77 @@
+// Pipeline de l'API NordMail — module J2-M1.
+// Cible d'exécution : Jenkins 2.580.2, agent `any`, Docker local (DinD).
+// Les fichiers du lab sont montés en lecture seule dans /lab et copiés dans
+// le répertoire de travail au début de l'exécution.
+// Un seul contrôle bloque : le SCA sur une gravité HIGH ou CRITICAL.
+// SAST, quality gate et gravité HIGH d'image écrivent un rapport consultatif.
+// Le DAST n'est pas dans ce pipeline : sa place est expliquée dans le module.
+
+pipeline {
+    agent any
+
+    options {
+        skipDefaultCheckout(true)
+        timeout(time: 25, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+
+    environment {
+        APP_IMAGE = "nordmail-api:${BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Preparation') {
+            steps {
+                sh 'rm -rf app outils rapports Jenkinsfile'
+                sh 'cp -a /labs/app /labs/outils /labs/Jenkinsfile .'
+                sh 'mkdir -p rapports'
+            }
+        }
+
+        stage('Dependances') {
+            steps {
+                // Bloquant : une dependance HIGH ou CRITICAL arrete la livraison.
+                sh 'trivy fs --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --no-progress --quiet app'
+                // Consultatif : les gravites moyennes sont archivees, pas bloquantes.
+                sh 'trivy fs --scanners vuln --severity MEDIUM --format json --output rapports/dependances-medium.json --no-progress --quiet app || true'
+            }
+        }
+
+        stage('Analyse statique') {
+            steps {
+                // Consultatif jusqu'a la cloture du registre ouvert en J2-M2.
+                sh 'semgrep --config outils/semgrep-nordmail.yml --json --output rapports/semgrep.json --quiet app || true'
+            }
+        }
+
+        stage('Qualite') {
+            steps {
+                withCredentials([string(credentialsId: 'jeton-sonar', variable: 'SONAR_TOKEN')]) {
+                    // Consultatif : la quality gate mesure le code nouveau, pas l'etat du projet.
+                    sh 'sonar-scanner -Dsonar.host.url="$SONAR_HOST_URL" -Dsonar.login="$SONAR_TOKEN" -Dproject.settings=outils/sonar-project.properties || true'
+                }
+            }
+        }
+
+        stage('Construction') {
+            steps {
+                sh 'docker build --tag "$APP_IMAGE" app'
+            }
+        }
+
+        stage('Scan image') {
+            steps {
+                // Bloquant sur CRITICAL seulement : le seuil est ecrit, il ne se discute pas au passage.
+                sh 'trivy image --severity CRITICAL --exit-code 1 --no-progress --quiet "$APP_IMAGE"'
+                sh 'trivy image --severity HIGH --format json --output rapports/image-high.json --no-progress --quiet "$APP_IMAGE" || true'
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'rapports/**', allowEmptyArchive: true
+        }
+    }
+}

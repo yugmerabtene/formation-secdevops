@@ -1,0 +1,19 @@
+[
+  {
+    "route": "/recherche",
+    "entree": "q={{7*7}}",
+    "attendu": "la réponse contient 49",
+    "preuve": "curl -s 'http://127.0.0.1:9101/recherche?q={{7*7}}'"
+  },
+  {
+    "route": "/export",
+    "entree": "fichier=../../etc/passwd",
+    "attendu": "code 404 et aucun contenu de fichier système",
+    "preuve": "curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1:9101/export?fichier=../../etc/passwd'"
+  },
+  {
+    "route": "/notes",
+    "entree": "GET /notes",
+    "attendu": "la requête est acceptée"
+  }
+]

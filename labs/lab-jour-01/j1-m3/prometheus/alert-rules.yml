@@ -1,0 +1,84 @@
+# Règles d'alerte du lab J1-M3 — POINT DE DÉPART INCOMPLET.
+#
+# Trois manques sont volontaires. Le module indique lesquels et comment les
+# corriger ; le corrigé de référence est dans ../j1-m3-solution/prometheus/.
+#
+#   1. DemoAppAuthFailureSpike n'a pas de fenêtre `for:` : elle passe de
+#      `pending` à `firing` au premier point au-dessus du seuil.
+#   2. DemoAppAuthFailureSpike n'a pas d'annotation `runbook_url`.
+#   3. L'alerte de balayage 404 (DemoAppNotFoundScan) est absente.
+
+groups:
+  - name: demo-app-availability
+    interval: 5s
+    rules:
+      - alert: DemoAppDown
+        expr: up{job="demo-app"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "demo-app ne répond plus au scrape Prometheus"
+          description: >-
+            La cible {{ $labels.instance }} du job {{ $labels.job }} est
+            injoignable depuis plus de 30 secondes. Vérifier le conteneur,
+            puis les journaux applicatifs.
+          runbook_url: "https://example.invalid/runbooks/demo-app-down"
+
+      - alert: DemoAppHighErrorRate
+        expr: |
+          (
+            sum by (job) (rate(http_requests_total{job="demo-app", status=~"5.."}[2m]))
+            /
+            clamp_min(sum by (job) (rate(http_requests_total{job="demo-app"}[2m])), 0.001)
+            > 0.05
+          )
+          and
+          sum by (job) (rate(http_requests_total{job="demo-app"}[2m])) > 0.1
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "Plus de 5 % de réponses 5xx sur demo-app"
+          description: >-
+            Le taux d'erreur serveur dépasse 5 % depuis plus d'une minute
+            (fenêtre de calcul 2 min, garde-fou : au moins 0,1 requête/s).
+            Taux courant : {{ $value | humanizePercentage }}.
+          runbook_url: "https://example.invalid/runbooks/demo-app-high-error-rate"
+
+      - alert: DemoAppLatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, job) (rate(http_request_duration_seconds_bucket{job="demo-app"}[2m]))
+          ) > 1
+        for: 1m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Latence p95 supérieure à 1 s sur demo-app"
+          description: >-
+            Le 95e centile de latence dépasse 1 seconde depuis plus d'une
+            minute. Valeur courante : {{ $value | humanizeDuration }}.
+          runbook_url: "https://example.invalid/runbooks/demo-app-latency"
+
+  - name: demo-app-security
+    interval: 5s
+    rules:
+      - alert: DemoAppAuthFailureSpike
+        expr: |
+          sum by (job) (rate(http_requests_total{job="demo-app", status=~"401|403"}[1m])) > 0.2
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Pic de refus d'authentification ou d'autorisation"
+          description: >-
+            Plus de 0,2 refus par seconde (401/403). Hypothèse : bourrage
+            d'identifiants ou énumération de ressources. Corréler avec les
+            journaux, l'adresse source et les autres services.
+
+      # DemoAppNotFoundScan : à écrire d'après le module J1-M3.

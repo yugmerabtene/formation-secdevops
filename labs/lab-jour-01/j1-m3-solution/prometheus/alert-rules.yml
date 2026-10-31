@@ -1,0 +1,101 @@
+# Règles d'alerte du lab J1-M3.
+# Convention de nommage : <Service><Symptome>, labels severity et category.
+# Chaque alerte doit renvoyer vers un runbook (annotation runbook_url).
+
+groups:
+  # ---------------------------------------------------------------------------
+  # Disponibilité : alertes « symptom-based » (ce que voit l'utilisateur).
+  # ---------------------------------------------------------------------------
+  - name: demo-app-availability
+    interval: 5s
+    rules:
+      - alert: DemoAppDown
+        expr: up{job="demo-app"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "demo-app ne répond plus au scrape Prometheus"
+          description: >-
+            La cible {{ $labels.instance }} du job {{ $labels.job }} est
+            injoignable depuis plus de 30 secondes. Vérifier le conteneur,
+            puis les logs applicatifs.
+          runbook_url: "https://example.invalid/runbooks/demo-app-down"
+
+      - alert: DemoAppHighErrorRate
+        expr: |
+          (
+            sum by (job) (rate(http_requests_total{job="demo-app", status=~"5.."}[2m]))
+            /
+            clamp_min(sum by (job) (rate(http_requests_total{job="demo-app"}[2m])), 0.001)
+            > 0.05
+          )
+          and
+          sum by (job) (rate(http_requests_total{job="demo-app"}[2m])) > 0.1
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "Plus de 5 % de réponses 5xx sur demo-app"
+          description: >-
+            Le taux d'erreur serveur dépasse 5 % depuis plus d'une minute
+            (fenêtre de calcul 2 min, garde-fou : au moins 0,1 requête/s).
+            Taux courant : {{ $value | humanizePercentage }}.
+          runbook_url: "https://example.invalid/runbooks/demo-app-high-error-rate"
+
+      - alert: DemoAppLatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, job) (rate(http_request_duration_seconds_bucket{job="demo-app"}[2m]))
+          ) > 1
+        for: 1m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Latence p95 supérieure à 1 s sur demo-app"
+          description: >-
+            Le 95e centile de latence dépasse 1 seconde depuis plus d'une
+            minute. Valeur courante : {{ $value | humanizeDuration }}.
+          runbook_url: "https://example.invalid/runbooks/demo-app-latency"
+
+  # ---------------------------------------------------------------------------
+  # Sécurité : hypothèses d'attaque, alertes « cause-based ».
+  # Un pic de 401/403 ou de 404 n'est pas une preuve d'attaque : c'est un
+  # signal à trier (voir la partie triage du module).
+  # ---------------------------------------------------------------------------
+  - name: demo-app-security
+    interval: 5s
+    rules:
+      - alert: DemoAppAuthFailureSpike
+        expr: |
+          sum by (job) (rate(http_requests_total{job="demo-app", status=~"401|403"}[1m])) > 0.2
+        for: 30s
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Pic de refus d'authentification ou d'autorisation"
+          description: >-
+            Plus de 0,2 refus par seconde (401/403) depuis 30 secondes.
+            Hypothèse : bourrage d'identifiants ou énumération de ressources.
+            Corréler avec les logs, l'adresse source et les autres services.
+          runbook_url: "https://example.invalid/runbooks/demo-app-auth-spike"
+
+      - alert: DemoAppNotFoundScan
+        expr: |
+          sum by (job) (rate(http_requests_total{job="demo-app", status="404"}[1m])) > 0.5
+        for: 30s
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Balayage d'URL probable sur demo-app"
+          description: >-
+            Plus de 0,5 réponse 404 par seconde depuis 30 secondes, alors que
+            les routes connues sont stables. Hypothèse : énumération de
+            chemins (scan). Vérifier l'adresse source et les chemins demandés.
+          runbook_url: "https://example.invalid/runbooks/demo-app-url-scan"

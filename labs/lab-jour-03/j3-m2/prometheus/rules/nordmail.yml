@@ -1,0 +1,13 @@
+# prometheus/rules/nordmail.yml
+groups:
+  - name: nordmail-disponibilite
+    rules:
+      - alert: NordMailErreurs5xx
+        expr: sum(increase(nordmail_requetes_total{code=~"5.."}[2m])) > 20
+        for: 30s
+        labels:
+          severity: warning
+          service: nordmail
+        annotations:
+          resume: "Plus de 20 réponses 5xx en 2 minutes sur NordMail."
+          action: "Consulter {job=\"nordmail\"} dans Loki, puis le registre des vulnérabilités."

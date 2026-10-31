@@ -1,0 +1,41 @@
+// Pipeline de l'API de notes NordMail, tel qu'il tourne en janvier 2026.
+// FICHIER PÉDAGOGIQUE : les défauts sont volontaires et décrits dans le
+// module J1-M1. Ne pas copier ce pipeline dans un projet réel.
+pipeline {
+    agent any
+
+    environment {
+        REGISTRY       = "registry.local"
+        REGISTRY_TOKEN = "token-registre-exemple"
+        DEPLOY_KEY     = "cle-de-deploiement-exemple"
+        APP_ENV        = "staging"
+    }
+
+    stages {
+        stage('Compilation') {
+            steps {
+                sh 'pip install -r requirements.txt'
+                sh 'python -m compileall app.py'
+            }
+        }
+
+        stage('Construction de image') {
+            steps {
+                sh "docker build -t ${REGISTRY}/notes-api:latest ."
+            }
+        }
+
+        stage('Publication') {
+            steps {
+                sh "docker login ${REGISTRY} -u jenkins -p ${REGISTRY_TOKEN}"
+                sh "docker push ${REGISTRY}/notes-api:latest"
+            }
+        }
+
+        stage('Deploiement') {
+            steps {
+                sh "ssh -i ${DEPLOY_KEY} deploy@staging.example.internal 'docker compose pull && docker compose up -d'"
+            }
+        }
+    }
+}

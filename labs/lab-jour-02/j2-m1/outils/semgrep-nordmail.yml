@@ -1,0 +1,32 @@
+# Jeu de règles Semgrep du lab J2-M1 — quatre règles écrites pour NordMail.
+# Semgrep ne trouve que ce qu'une règle décrit : ces quatre règles ne couvrent
+# ni la traversée de chemin, ni l'absence d'autorisation.
+rules:
+  - id: nordmail-flask-debogage
+    languages: [python]
+    severity: ERROR
+    message: "Serveur Flask démarré avec debug=True : la console de débogage expose le code."
+    patterns:
+      - pattern: $APP.run(..., debug=True, ...)
+
+  - id: nordmail-shell-concatene
+    languages: [python]
+    severity: ERROR
+    message: "subprocess avec shell=True et une commande construite : injection de commande."
+    patterns:
+      - pattern: subprocess.run($CMD, shell=True, ...)
+      - pattern-not: subprocess.run([...], shell=True, ...)
+
+  - id: nordmail-gabarit-utilisateur
+    languages: [python]
+    severity: WARNING
+    message: "render_template_string reçoit autre chose qu'une chaîne littérale : injection de gabarit."
+    patterns:
+      - pattern: flask.render_template_string($X)
+      - pattern-not: flask.render_template_string("...")
+
+  - id: nordmail-empreinte-md5
+    languages: [python]
+    severity: WARNING
+    message: "MD5 ne convient pas à une empreinte de sécurité."
+    pattern: hashlib.md5(...)

@@ -1,0 +1,32 @@
+# Configuration Prometheus du lab J1-M3.
+# Scrape et évaluation à 5 s : cadence pédagogique, pas une cadence de
+# production (15 à 60 s suffisent le plus souvent).
+
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+  external_labels:
+    environment: lab-j1m3
+    training: secdevops
+
+rule_files:
+  - /etc/prometheus/alert-rules.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090
+
+  - job_name: demo-app
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets:
+          - app:8000

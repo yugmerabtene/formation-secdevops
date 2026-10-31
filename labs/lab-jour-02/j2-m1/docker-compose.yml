@@ -1,0 +1,66 @@
+name: j2m1
+
+services:
+  app:
+    build:
+      context: ./app
+    image: j2m1-app:1
+    container_name: j2m1-app
+    ports:
+      - "127.0.0.1:8099:5000"
+    networks:
+      - j2m1
+
+  sonarqube:
+    image: sonarqube:9.9.8-community
+    container_name: j2m1-sonarqube
+    ports:
+      - "127.0.0.1:9000:9000"
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    volumes:
+      - ./donnees-sonarqube:/opt/sonarqube/data
+      - sonarqube-logs:/opt/sonarqube/logs
+    networks:
+      - j2m1
+
+  docker:
+    image: docker:29.1.3-dind
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: /certs
+    volumes:
+      - jenkins-docker-certs:/certs/client
+    networks:
+      - j2m1
+
+  jenkins:
+    build:
+      context: ./jenkins
+    image: j2m1-jenkins:2.580.2
+    container_name: j2m1-jenkins
+    ports:
+      - "127.0.0.1:8089:8080"
+    environment:
+      DOCKER_HOST: tcp://docker:2376
+      DOCKER_CERT_PATH: /certs/client
+      DOCKER_TLS_VERIFY: "1"
+      TRIVY_CACHE_DIR: /var/jenkins_home/.cache/trivy
+      SONAR_HOST_URL: http://sonarqube:9000
+      JAVA_OPTS: -Djenkins.install.runSetupWizard=false
+    volumes:
+      - jenkins-data:/var/jenkins_home
+      - jenkins-docker-certs:/certs/client:ro
+      - ./:/lab:ro
+    networks:
+      - j2m1
+    depends_on:
+      - docker
+      - sonarqube
+
+volumes:
+  jenkins-data:
+  jenkins-docker-certs:
+  sonarqube-logs:
+networks:
+  j2m1:

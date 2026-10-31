@@ -1,0 +1,13 @@
+# alertmanager/alertmanager.yml
+route:
+  receiver: webhook-nordmail
+  group_by: ["alertname", "service"]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
+
+receivers:
+  - name: webhook-nordmail
+    webhook_configs:
+      - url: http://app:5000/webhook-alerte
+        send_resolved: true

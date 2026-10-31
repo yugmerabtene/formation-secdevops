@@ -1,0 +1,25 @@
+title = "Règles gitleaks pour lab NordMail J1-M1"
+
+[[rules]]
+id = "python-password"
+description = "Mot de passe en dur dans code Python"
+regex = '''(?i)(password|passwd|pwd)\s*[=:]\s*["'][^"']{4,}["']'''
+tags = ["secret", "python"]
+
+[[rules]]
+id = "flask-secret-key"
+description = "Clé de session Flask en dur"
+regex = '''(?i)secret_key\s*[=:]\s*["'][^"']{8,}["']'''
+tags = ["secret", "flask"]
+
+[[rules]]
+id = "generic-token"
+description = "Jeton générique type token/key/secret"
+regex = '''(?i)(token|key|secret)\s*[=:]\s*["'][^"']{8,}["']'''
+tags = ["secret", "generic"]
+
+[[rules]]
+id = "hmac-key"
+description = "Clé HMAC en dur (format base64/hex long)"
+regex = '''(?i)hmac[_-]?key\s*[=:]\s*["'][a-zA-Z0-9+/=]{32,}["']'''
+tags = ["secret", "hmac"]

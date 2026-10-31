@@ -1,0 +1,93 @@
+# Lab J1-M3 — chaîne de surveillance locale, point de départ de l'apprenant.
+# Démonstration pédagogique : pas de TLS, identifiants de démo, aucune donnée
+# réelle. Ne jamais exposer ces ports sur Internet.
+#
+# Lancement : docker compose -f labs/lab-jour-01/j1-m3/docker-compose.yml up -d --build
+# Arrêt     : docker compose -f labs/lab-jour-01/j1-m3/docker-compose.yml down -v
+#
+# Un seul empilement J1-M3 peut tourner à la fois : les ports 3000, 8000, 8025,
+# 9090 et 9093 sont fixes. Arrêter toute autre pile du même module avant de
+# démarrer celle-ci.
+
+name: j1-m3-lab
+
+services:
+  app:
+    build:
+      context: ./app
+    container_name: j1m3lab-app
+    environment:
+      APP_PORT: "8000"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: j1m3lab-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=6h"
+      - "--web.enable-lifecycle"
+    volumes:
+      - "./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - "./prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro"
+    ports:
+      - "9090:9090"
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: j1m3lab-alertmanager
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    volumes:
+      - "./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro"
+    ports:
+      - "9093:9093"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: j1m3lab-grafana
+    # Identifiants de DÉMONSTRATION, triviaux et assumés. En production :
+    # OIDC, coffre de secrets, mot de passe aléatoire, TLS, sauvegarde.
+    environment:
+      GF_SECURITY_ADMIN_USER: "admin"
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - "./grafana/provisioning:/etc/grafana/provisioning:ro"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # Boîte aux lettres locale : elle joue le rôle du canal de notification.
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: j1m3lab-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    restart: unless-stopped

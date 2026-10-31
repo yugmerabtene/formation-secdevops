@@ -1,0 +1,21 @@
+{
+  "uid": "nordmail-securite",
+  "title": "NordMail — surveillance de sécurité",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": {"from": "now-15m", "to": "now"},
+  "panels": [
+    {"id": 1, "type": "timeseries", "title": "Réponses 5xx par seconde",
+     "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+     "datasource": {"type": "prometheus", "uid": "prometheus"},
+     "targets": [{"refId": "A", "expr": "sum(rate(nordmail_requetes_total{code=~\"5..\"}[1m]))"}]},
+    {"id": 2, "type": "stat", "title": "Notifications d'alerte reçues",
+     "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+     "datasource": {"type": "prometheus", "uid": "prometheus"},
+     "targets": [{"refId": "A", "expr": "nordmail_webhook_alertes_total"}]},
+    {"id": 3, "type": "logs", "title": "Journaux NordMail",
+     "gridPos": {"h": 9, "w": 24, "x": 0, "y": 8},
+     "datasource": {"type": "loki", "uid": "loki"},
+     "targets": [{"refId": "A", "expr": "{job=\"nordmail\"}"}]}
+  ]
+}

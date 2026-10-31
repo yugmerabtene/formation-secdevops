@@ -1,0 +1,91 @@
+// Pipeline de l'API de notes NordMail — module J1-M2.
+// Cible d'exécution : Jenkins 2.580.2, agent `any`, Docker local (DinD).
+// Les fichiers du lab sont montés en lecture seule dans /lab et copiés dans
+// le répertoire de travail au début de l'exécution.
+
+pipeline {
+    agent any
+
+    options {
+        skipDefaultCheckout(true)
+        timeout(time: 20, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+
+    environment {
+        APP_IMAGE = "notes-api:${BUILD_NUMBER}"
+        TRIVY_DISABLE_VEX_NOTICE = "true"
+    }
+
+    stages {
+        stage('Preparation') {
+            steps {
+                sh 'rm -rf app outils Jenkinsfile rapports'
+                sh 'cp -a /lab/app /lab/outils /lab/Jenkinsfile .'
+                sh 'mkdir -p rapports'
+            }
+        }
+
+        stage('Secrets') {
+            steps {
+                sh 'gitleaks dir . --config outils/.gitleaks.toml --no-banner --redact -v --no-color --log-level error'
+            }
+        }
+
+        stage('Dependances') {
+            steps {
+                sh 'python3 -m venv .venv'
+                sh '.venv/bin/pip install --quiet -r app/requirements.txt -r app/requirements-dev.txt'
+                sh 'trivy fs --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --no-progress --quiet app'
+            }
+        }
+
+        stage('Analyse statique') {
+            steps {
+                sh '.venv/bin/bandit -q -r app -x app/tests -f txt'
+            }
+        }
+
+        stage('Tests') {
+            steps {
+                dir('app') {
+                    sh '../.venv/bin/python -m pytest -q tests'
+                }
+            }
+        }
+
+        stage('Dockerfile') {
+            steps {
+                sh 'hadolint --no-color --config outils/.hadolint.yaml app/Dockerfile'
+            }
+        }
+
+        stage('Construction') {
+            steps {
+                sh 'docker build --tag "$APP_IMAGE" app'
+            }
+        }
+
+        stage('Scan image') {
+            steps {
+                sh 'trivy image --severity CRITICAL --exit-code 1 --no-progress --quiet "$APP_IMAGE"'
+                sh 'trivy image --severity HIGH --format json --output rapports/image-high.json --no-progress --quiet "$APP_IMAGE" || true'
+            }
+        }
+
+        stage('Publication') {
+            steps {
+                withCredentials([string(credentialsId: 'jeton-registre', variable: 'REGISTRY_TOKEN')]) {
+                    sh 'if [ -n "$REGISTRY_TOKEN" ]; then echo "credential jeton-registre injecte"; else echo "credential jeton-registre absent"; exit 1; fi'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'rapports/**', allowEmptyArchive: true
+        }
+    }
+}

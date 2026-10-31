@@ -1,0 +1,6 @@
+# Dépendances épinglées de NordMail v2 — versions volontairement datées.
+# Les modules J2-M1 et J2-M2 montrent ce que ces versions exposent.
+Flask==2.3.2
+Werkzeug==2.3.4
+Jinja2==3.1.2
+requests==2.31.0

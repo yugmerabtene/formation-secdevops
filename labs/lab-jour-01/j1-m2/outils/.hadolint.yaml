@@ -1,0 +1,6 @@
+ignored:
+  - DL3008  # Pin versions in apt-get install (lab: pas d'apk/apt dans l'image finale)
+  - DL3013  # Pin versions in pip (lab: requirements.txt gère les versions)
+trustedRegistries:
+  - docker.io
+  - registry.local

@@ -1,0 +1,57 @@
+# Configuration Alertmanager du lab J1-M3 — POINT DE DÉPART INCOMPLET.
+#
+# Un défaut volontaire : le routage des alertes critiques pointe vers le
+# récepteur `equipe-nuit`, qui envoie vers un service absent du lab
+# (http://127.0.0.1:9999/alertes). Alertmanager accepte la configuration,
+# Prometheus passe l'alerte à `firing`, et aucune notification n'arrive.
+#
+# Le corrigé de référence est dans ../j1-m3-solution/alertmanager/.
+
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: "mailhog:1025"
+  smtp_from: "alertmanager@demo.invalid"
+  smtp_require_tls: false
+
+route:
+  receiver: mailhog-demo
+  group_by: ["alertname", "severity"]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 1h
+  routes:
+    # Défaut volontaire : les alertes critiques partent vers un canal mort.
+    - matchers:
+        - severity="critical"
+      receiver: equipe-nuit
+      group_wait: 5s
+      group_interval: 30s
+      repeat_interval: 30m
+    # Les alertes de sécurité, elles, arrivent bien dans MailHog : c'est la
+    # preuve que le canal de notification fonctionne.
+    - matchers:
+        - category="security"
+      receiver: mailhog-demo
+      group_by: ["alertname", "category"]
+      group_wait: 5s
+
+inhibit_rules:
+  - source_matchers:
+      - alertname="DemoAppDown"
+    target_matchers:
+      - alertname=~"DemoAppHighErrorRate|DemoAppLatencyHigh"
+    equal: ["job"]
+
+receivers:
+  - name: mailhog-demo
+    email_configs:
+      - to: "oncall@demo.invalid"
+        send_resolved: true
+        headers:
+          Subject: "[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+
+  # Récepteur incomplet : l'URL ne correspond à aucun service du lab.
+  - name: equipe-nuit
+    webhook_configs:
+      - url: "http://127.0.0.1:9999/alertes"
+        send_resolved: true

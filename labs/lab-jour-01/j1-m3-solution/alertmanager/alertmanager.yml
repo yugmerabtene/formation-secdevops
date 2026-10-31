@@ -1,0 +1,56 @@
+# Configuration Alertmanager du lab J1-M3 (démonstration locale uniquement).
+# Aucun identifiant réel, aucun token : les destinataires utilisent le
+# domaine réservé .invalid et le SMTP est un conteneur MailHog local.
+
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: "mailhog:1025"
+  smtp_from: "alertmanager@demo.invalid"
+  smtp_require_tls: false
+
+route:
+  receiver: mailhog-demo
+  group_by: ["alertname", "severity"]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 1h
+  routes:
+    # Les alertes critiques partent plus vite et sont répétées plus souvent.
+    - matchers:
+        - severity="critical"
+      receiver: mailhog-demo
+      group_wait: 5s
+      group_interval: 30s
+      repeat_interval: 30m
+    # Les alertes de sécurité sont regroupées par catégorie pour le triage.
+    - matchers:
+        - category="security"
+      receiver: mailhog-demo
+      group_by: ["alertname", "category"]
+      group_wait: 5s
+
+# Une alerte « service down » rend inutile le bruit sur le taux d'erreur
+# et la latence du même service : on l'inhibe le temps du diagnostic.
+inhibit_rules:
+  - source_matchers:
+      - alertname="DemoAppDown"
+    target_matchers:
+      - alertname=~"DemoAppHighErrorRate|DemoAppLatencyHigh"
+    equal: ["job"]
+
+receivers:
+  - name: mailhog-demo
+    email_configs:
+      - to: "oncall@demo.invalid"
+        send_resolved: true
+        headers:
+          Subject: "[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}"
+    # Variante webhook, à activer si vous branchez un récepteur local.
+    # Le token reste un placeholder : ne jamais committer un vrai secret.
+    # webhook_configs:
+    #   - url: "http://127.0.0.1:8080/webhook"
+    #     send_resolved: true
+    #     http_config:
+    #       authorization:
+    #         type: Bearer
+    #         credentials: "<WEBHOOK_TOKEN_PLACEHOLDER>"
